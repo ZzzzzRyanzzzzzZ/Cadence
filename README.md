@@ -146,6 +146,24 @@ Designed for people who cannot tolerate the average app right now.
 - **Every chart has a table view**, direct series labels, and a colour-blind-validated palette (checked with a CVD ΔE validator against both light and dark surfaces).
 - Full keyboard navigation, visible focus, labelled control groups, live regions, and a skip link.
 
+## Putting it online
+
+Cadence has a real backend (accounts, email codes, encrypted backup), so where you host it changes what works.
+
+| Host | Sign-in and accounts | Everything else | Cost |
+|---|---|---|---|
+| **Render** | Yes | Yes | Free tier |
+| **GitHub Pages** | No, falls back to device-only mode | Yes, all of it | Free |
+| **Vercel** | Needs rework | Yes | Free tier |
+
+**Render is the recommended target.** `render.yaml` is already written, so it is a Blueprint deploy: push to GitHub, then New -> Blueprint on Render, point it at the repo, and enter `BREVO_API_KEY` when prompted. `SESSION_SECRET` is generated automatically. Free instances sleep after 15 minutes idle and take roughly a minute to wake, so open the link once before demoing it to anyone.
+
+On the free plan accounts live in ephemeral storage: they survive restarts within a deploy but are wiped on redeploy. Health data is unaffected either way, because it never leaves the browser. `render.yaml` documents the two-line change for a persistent disk on a paid instance.
+
+**GitHub Pages** is set up as a static fallback in `.github/workflows/pages.yml`, publishing the `web/` folder on every push to `main`. There is no server there, so the sign-in probe fails and the landing page offers device-only mode instead. Every clinical feature, every model and all the charts work exactly the same, because they were always client side. It never sleeps, which makes it a good backup link for a live demo.
+
+**Vercel** would host the static side fine, but `server.js` is a long-lived Node process that writes accounts to a JSON file. Vercel is serverless with an ephemeral filesystem, so it would need the routes rewritten as functions and the store moved to a hosted KV. Not worth doing when Render runs it unchanged.
+
 ## Deploying to Render
 
 `render.yaml` is a Render Blueprint. Point Render at the repo and it builds a Node web service, mounts a 1 GB disk at `/var/data` for the account database, generates `SESSION_SECRET`, and health-checks `/api/health`.
