@@ -1,0 +1,15 @@
+{
+  "name": "Cadence — concussion recovery",
+  "short_name": "Cadence",
+  "description": "Symptom tracking, cognitive testing and a graded return-to-activity plan for concussion recovery.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fbf6ee",
+  "theme_color": "#fbf6ee",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

@@ -1,0 +1,117 @@
+﻿<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Cadence — an evidence-informed companion for concussion recovery. Symptom tracking, cognitive testing and a graded return-to-activity plan, with the analysis running on your own device.">
+<meta name="theme-color" content="#fbf6ee">
+<title>Cadence — Recovery has a rhythm</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23d24a1a'/%3E%3Cpath d='M4 18h5l3-8 4 14 3-9 2 3h7' fill='none' stroke='%23fffdfa' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/tokens.css?v=1">
+<link rel="stylesheet" href="css/base.css?v=1">
+<link rel="stylesheet" href="css/components.css?v=1">
+<link rel="stylesheet" href="css/screens.css?v=1">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<div id="app" class="app" hidden>
+  <header class="appbar">
+    <button class="appbar__menu" id="navToggle" aria-label="Open navigation" aria-expanded="false" aria-controls="nav">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <a class="brand" href="#/today" aria-label="Cadence home">
+      <svg class="brand__mark" viewBox="0 0 40 24" aria-hidden="true"><path d="M2 15h5.5l3.5-10 4.5 17 3.5-11 2.4 4H38"/></svg>
+      <span class="brand__word">Cadence</span>
+    </a>
+    <div class="appbar__spacer"></div>
+    <div class="appbar__day" id="dayCounter" aria-live="polite"></div>
+    <button class="appbar__avatar" id="accountBtn" aria-label="Account"></button>
+    <button class="btn btn--danger-ghost appbar__flag" id="redFlagBtn">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v18M12 4h8l-2.4 4L20 12h-8"/></svg>
+      <span>Red flags</span>
+    </button>
+  </header>
+
+  <nav class="nav" id="nav" aria-label="Primary">
+    <div class="nav__inner">
+      <p class="nav__group">Daily</p>
+      <a class="nav__link" href="#/today" data-route="today"><span class="nav__ico" data-ico="today"></span>Today</a>
+      <a class="nav__link" href="#/checkin" data-route="checkin"><span class="nav__ico" data-ico="checkin"></span>Symptom check-in</a>
+      <a class="nav__link" href="#/mind" data-route="mind"><span class="nav__ico" data-ico="mind"></span>Mind &amp; mood</a>
+      <p class="nav__group">Assess</p>
+      <a class="nav__link" href="#/cognition" data-route="cognition"><span class="nav__ico" data-ico="cognition"></span>Cognitive battery</a>
+      <a class="nav__link" href="#/oculomotor" data-route="oculomotor"><span class="nav__ico" data-ico="eye"></span>Oculomotor screen</a>
+      <a class="nav__link" href="#/balance" data-route="balance"><span class="nav__ico" data-ico="balance"></span>Balance</a>
+      <p class="nav__group">Recover</p>
+      <a class="nav__link" href="#/ladder" data-route="ladder"><span class="nav__ico" data-ico="trend"></span>Exposure ladder</a>
+      <a class="nav__link" href="#/plan" data-route="plan"><span class="nav__ico" data-ico="plan"></span>Return-to-activity</a>
+      <a class="nav__link" href="#/insights" data-route="insights"><span class="nav__ico" data-ico="insights"></span>Insights</a>
+      <a class="nav__link" href="#/caregiver" data-route="caregiver"><span class="nav__ico" data-ico="heart"></span>Caregiver page</a>
+      <a class="nav__link" href="#/report" data-route="report"><span class="nav__ico" data-ico="report"></span>Clinician report</a>
+      <p class="nav__group">App</p>
+      <a class="nav__link" href="#/settings" data-route="settings"><span class="nav__ico" data-ico="settings"></span>Settings &amp; data</a>
+      <a class="nav__link" href="#/science" data-route="science"><span class="nav__ico" data-ico="science"></span>How this works</a>
+    </div>
+    <div class="nav__foot">
+      <p class="nav__privacy"><span class="dot dot--good"></span>Your data stays on this device</p>
+    </div>
+  </nav>
+  <div class="nav__scrim" id="navScrim" hidden></div>
+
+  <main id="main" class="main" tabindex="-1"></main>
+
+  <nav class="tabbar" aria-label="Quick navigation">
+    <a class="tabbar__item" href="#/today" data-route="today"><span class="tabbar__ico" data-ico="today"></span><span>Today</span></a>
+    <a class="tabbar__item" href="#/checkin" data-route="checkin"><span class="tabbar__ico" data-ico="checkin"></span><span>Check-in</span></a>
+    <a class="tabbar__item" href="#/cognition" data-route="cognition"><span class="tabbar__ico" data-ico="cognition"></span><span>Tests</span></a>
+    <a class="tabbar__item" href="#/plan" data-route="plan"><span class="tabbar__ico" data-ico="plan"></span><span>Plan</span></a>
+    <button class="tabbar__item" id="tabMore"><span class="tabbar__ico" data-ico="more"></span><span>More</span></button>
+  </nav>
+</div>
+
+<div id="modalRoot" class="modal-root" hidden></div>
+<div id="toastRoot" class="toast-root" role="status" aria-live="polite"></div>
+<div id="restBanner" class="rest-banner" hidden role="status"></div>
+
+<script src="js/core/dom.js?v=1"></script>
+<script src="js/core/api.js?v=1"></script>
+<script src="js/core/store.js?v=1"></script>
+<script src="js/core/crypto.js?v=1"></script>
+<script src="js/core/speech.js?v=1"></script>
+<script src="js/core/charts.js?v=1"></script>
+<script src="js/data/pcss.js?v=1"></script>
+<script src="js/data/oculomotor.js?v=1"></script>
+<script src="js/data/protocol.js?v=1"></script>
+<script src="js/data/references.js?v=1"></script>
+<script src="js/ml/stats.js?v=1"></script>
+<script src="js/ml/trajectory.js?v=1"></script>
+<script src="js/ml/rci.js?v=1"></script>
+<script src="js/ml/risk.js?v=1"></script>
+<script src="js/ml/anomaly.js?v=1"></script>
+<script src="js/ml/triggers.js?v=1"></script>
+<script src="js/core/derive.js?v=1"></script>
+<script src="js/core/tolerance.js?v=1"></script>
+<script src="js/core/comfort-widget.js?v=1"></script>
+<script src="js/core/seed.js?v=1"></script>
+<script src="js/screens/auth.js?v=1"></script>
+<script src="js/screens/onboarding.js?v=1"></script>
+<script src="js/screens/today.js?v=1"></script>
+<script src="js/screens/checkin.js?v=1"></script>
+<script src="js/screens/cognition.js?v=1"></script>
+<script src="js/screens/oculomotor.js?v=1"></script>
+<script src="js/screens/balance.js?v=1"></script>
+<script src="js/screens/ladder.js?v=1"></script>
+<script src="js/screens/caregiver.js?v=1"></script>
+<script src="js/screens/plan.js?v=1"></script>
+<script src="js/screens/insights.js?v=1"></script>
+<script src="js/screens/mind.js?v=1"></script>
+<script src="js/screens/report.js?v=1"></script>
+<script src="js/screens/settings.js?v=1"></script>
+<script src="js/screens/science.js?v=1"></script>
+<script src="js/main.js?v=1"></script>
+</body>
+</html>
+

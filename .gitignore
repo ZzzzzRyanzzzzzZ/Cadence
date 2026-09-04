@@ -1,0 +1,9 @@
+node_modules/
+.data/
+*.log
+.DS_Store
+
+# Never commit secrets. Everything .env* is ignored except the template.
+.env
+.env.*
+!.env.example

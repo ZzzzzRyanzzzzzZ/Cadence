@@ -1,0 +1,25 @@
+{
+  "name": "cadence",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cadence — an evidence-informed companion for concussion recovery. Symptom tracking, cognitive testing, an oculomotor screen and a graded return-to-activity plan, with every model running on the user's own device.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check-mail": "node scripts/check-mail.js",
+    "set-mail-key": "node scripts/set-mail-key.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "concussion",
+    "mtbi",
+    "health",
+    "recovery",
+    "accessibility",
+    "hackathon"
+  ],
+  "license": "MIT"
+}
