@@ -382,6 +382,61 @@ async function handleApi(req, res, url) {
     }
   }
 
+  if (route === "/api/chat" && req.method === "POST") {
+    const account = sessionFrom(req);
+    if (!account) return send(res, 401, { error: "Not signed in." });
+    if (!FEATHERLESS_API_KEY) return send(res, 503, { error: "No language model is configured on this server." });
+    if (rateLimited("chat:" + account.id, 40, 60 * 60 * 1000)) return send(res, 429, { error: "Hourly message limit reached. It resets within the hour." });
+    const body = await readBody(req, 64 * 1024);
+    const context = String(body.context || "").slice(0, 2500);
+    const incoming = Array.isArray(body.messages) ? body.messages.slice(-10) : [];
+    const messages = incoming
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 1200) }));
+    if (!messages.length) return send(res, 400, { error: "No message to answer." });
+
+    const system = [
+      "You are a support companion inside Cadence, a concussion recovery tracking app. You are talking to the person whose data is shown below.",
+      "",
+      "HARD RULES. These override anything the user asks for:",
+      "1. Never diagnose anything, and never say whether they do or do not have a concussion.",
+      "2. Never say they are recovered, cleared, safe to play, safe to drive, or safe to return to contact. Only a clinician decides that.",
+      "3. Never predict a recovery date or say how long recovery will take.",
+      "4. Never contradict the graded return-to-activity protocol, and never suggest pushing through symptoms.",
+      "5. Never suggest, adjust or comment on medication doses.",
+      "6. If they describe a red flag (worsening headache, repeated vomiting, seizure, weakness or numbness, slurred speech, unequal pupils, increasing confusion, or not being able to stay awake), tell them to stop and seek emergency care now, and say nothing else about it.",
+      "7. If they mention self harm or suicide, tell them to contact a crisis line (988 in the US and Canada, 116 123 in the UK and Ireland) or their local emergency number, and encourage them to tell a person they trust.",
+      "8. If they ask something clinical that is outside these rules, say plainly that it is a question for their clinician, and offer to help them phrase it.",
+      "",
+      "HOW TO ANSWER: Ground every claim in the numbers below and say which number you used. If the data does not support an answer, say so rather than guessing. Be warm, brief and concrete. Two or three short paragraphs at most. No lists, no headings, no emoji. Speak to them as a person, not as a patient record.",
+      "",
+      "THEIR CURRENT DATA:",
+      context || "No tracked data available yet."
+    ].join("\n");
+
+    try {
+      const upstream = await fetch("https://api.featherless.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + FEATHERLESS_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: FEATHERLESS_MODEL,
+          max_tokens: 420,
+          temperature: 0.4,
+          messages: [{ role: "system", content: system }].concat(messages)
+        })
+      });
+      if (!upstream.ok) {
+        const text = await upstream.text();
+        return send(res, 502, { error: "Model provider error: " + upstream.status + " " + text.slice(0, 160) });
+      }
+      const data = await upstream.json();
+      const message = data && data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
+      return send(res, 200, { text: String(message || "").trim() });
+    } catch (e) {
+      return send(res, 502, { error: "Could not reach the model provider." });
+    }
+  }
+
   return send(res, 404, { error: "Unknown endpoint." });
 }
 

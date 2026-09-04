@@ -65,6 +65,18 @@
     return wrap;
   }
 
+  function startDemo() {
+    CAD.seed.load();
+    CAD.store.update((s) => {
+      s.settings.onboarded = true;
+      s.settings.acknowledgedDisclaimer = true;
+    });
+    CAD.api.setGuest(true);
+    location.hash = "#/today";
+    CAD.toast("Demo loaded — 28 days of a realistic recovery.");
+    CAD.render(true);
+  }
+
   CAD.screens.auth = function () {
     let mode = "landing";
     let email = "";
@@ -133,13 +145,17 @@
         error ? h("p", { class: "auth-error" }, CAD.icon("alert", 16), error) : null,
         btn,
         h("button", {
-          type: "button", class: "btn btn--ghost btn--block", style: { marginTop: "10px" },
+          type: "button", class: "btn btn--block demo-btn", style: { marginTop: "10px" },
+          onclick: startDemo
+        }, CAD.icon("sparkle"), "Try the demo — 28 days of data"),
+        h("button", {
+          type: "button", class: "btn btn--ghost btn--block", style: { marginTop: "8px" },
           onclick: () => {
             CAD.api.setGuest(true);
             CAD.toast("Using Cadence on this device only.");
             CAD.render();
           }
-        }, CAD.icon("lock"), "Continue on this device only"),
+        }, CAD.icon("lock"), "Start empty on this device"),
         h("p", { class: "tiny muted", style: { marginTop: "14px" } },
           "Your account stores your email address and nothing else. Health data stays on your device unless you switch on encrypted backup, which encrypts it with a passphrase we never receive."));
     }
@@ -216,8 +232,12 @@
             : "The Cadence server did not respond. You can still use everything locally — accounts only add encrypted backup across devices."),
         h("button", {
           class: "btn btn--primary btn--lg btn--block", style: { marginTop: "16px" },
+          onclick: startDemo
+        }, CAD.icon("sparkle"), "Try the demo — 28 days of data"),
+        h("button", {
+          class: "btn btn--ghost btn--block", style: { marginTop: "8px" },
           onclick: () => { CAD.api.setGuest(true); CAD.render(); }
-        }, CAD.icon("arrow"), CAD.api.state.staticHost ? "Start using Cadence" : "Continue on this device"));
+        }, CAD.icon("arrow"), CAD.api.state.staticHost ? "Start empty" : "Continue on this device"));
     }
 
     function hero() {

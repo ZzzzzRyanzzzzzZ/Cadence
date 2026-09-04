@@ -103,6 +103,10 @@
     return call("/api/coach", { method: "POST", body: JSON.stringify({ summary }) });
   }
 
+  function chat(messages, context) {
+    return call("/api/chat", { method: "POST", body: JSON.stringify({ messages, context }) });
+  }
+
   function localSession() { return readLocal(); }
 
   function isGuest() {
@@ -117,6 +121,6 @@
 
   CAD.api = {
     state, probe, me, requestCode, verifyCode, logout,
-    saveBackup, loadBackup, deleteAccount, coach, localSession, isGuest, setGuest
+    saveBackup, loadBackup, deleteAccount, coach, chat, localSession, isGuest, setGuest
   };
 })();

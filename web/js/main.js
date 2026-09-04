@@ -2,10 +2,10 @@
   const CAD = window.CAD;
   const h = CAD.h;
 
-  const ROUTES = ["today", "checkin", "mind", "cognition", "oculomotor", "balance", "ladder", "plan", "insights", "caregiver", "report", "settings", "science"];
+  const ROUTES = ["today", "checkin", "mind", "cognition", "oculomotor", "balance", "ladder", "plan", "chat", "insights", "caregiver", "report", "settings", "science"];
   let currentScreen = null;
 
-  const NAV_ORDER = ["today", "checkin", "mind", "cognition", "oculomotor", "balance", "ladder", "plan", "insights", "caregiver", "report", "settings", "science"];
+  const NAV_ORDER = ["today", "checkin", "mind", "cognition", "oculomotor", "balance", "ladder", "plan", "chat", "insights", "caregiver", "report", "settings", "science"];
   function navOrder(name) {
     const i = NAV_ORDER.indexOf(name);
     return i < 0 ? NAV_ORDER.length : i;
