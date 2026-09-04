@@ -78,8 +78,11 @@
   }
 
   CAD.screens.auth = function () {
-    let mode = "landing";
-    let email = "";
+    let remembered = "";
+    try { remembered = localStorage.getItem("cadence.lastEmail") || ""; } catch (e) { remembered = ""; }
+    let mode = remembered ? "login" : "register";
+    let email = remembered;
+    let password = "";
     let devCode = null;
     let busy = false;
     let error = "";
@@ -97,7 +100,139 @@
 
     function authPanel() {
       if (mode === "code") return codePanel();
-      return emailPanel();
+      if (mode === "signupCode") return signupCodePanel();
+      if (mode === "email") return emailPanel();
+      return passwordPanel();
+    }
+
+    function signupCodePanel() {
+      const status = h("p", { class: "tiny muted" }, "");
+      const boxes = codeInput(async (code) => {
+        if (busy) return;
+        busy = true; error = "";
+        status.textContent = "Checking…";
+        try {
+          await CAD.api.verifySignup(email, code);
+          CAD.api.setGuest(false);
+          try { localStorage.setItem("cadence.lastEmail", email); } catch (e) {}
+          password = "";
+          CAD.toast("Account created. You are signed in.");
+          CAD.render(true);
+          return;
+        } catch (err) {
+          busy = false;
+          error = err.message || "That code did not work.";
+          render();
+          const cw = document.querySelector(".code-input");
+          if (cw && cw.clear) cw.clear();
+        }
+      });
+
+      return h("div", { class: "auth-card" },
+        h("p", { class: "eyebrow" }, "One time only" ),
+        h("h2", "Confirm your email"),
+        h("p", { class: "tiny muted" }, "We sent a six-digit code to " + email + ". Enter it once and your account is created. After this you sign in with just your email and password."),
+        boxes,
+        error ? h("p", { class: "auth-error" }, CAD.icon("alert", 16), error) : null,
+        status,
+        devCode ? h("div", { class: "callout callout--warn", style: { marginTop: "12px" } },
+          h("span", { class: "callout__ico" }, CAD.icon("info")),
+          h("div", h("strong", "Demo mode — code: " + devCode),
+            h("p", { style: { margin: "4px 0 0" } }, "No mail provider is configured on this server, so the code is shown here instead of emailed."))) : null,
+        h("div", { class: "row", style: { marginTop: "12px" } },
+          h("button", { class: "btn btn--ghost btn--sm", onclick: () => { mode = "register"; error = ""; devCode = null; render(); } }, "Back")));
+    }
+
+    function passwordPanel() {
+      const emailInput = h("input", {
+        class: "input", type: "email", value: email, placeholder: "you@example.com",
+        autocomplete: "email", "aria-label": "Email address", id: "authEmail",
+        oninput: (e) => { email = e.target.value.trim(); }
+      });
+      const pwInput = h("input", {
+        class: "input", type: "password", placeholder: "At least 8 characters",
+        autocomplete: mode === "register" ? "new-password" : "current-password",
+        "aria-label": "Password", id: "authPassword",
+        oninput: (e) => { password = e.target.value; }
+      });
+      const btn = h("button", { class: "btn btn--primary btn--lg btn--block", type: "submit", disabled: busy },
+        busy ? "Working…" : (mode === "register" ? "Create my account" : "Sign in"));
+
+      async function submit(e) {
+        if (e) e.preventDefault();
+        if (busy) return;
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+          error = "That does not look like an email address.";
+          return render();
+        }
+        if (password.length < 8) {
+          error = "Use a password of at least 8 characters.";
+          return render();
+        }
+        busy = true; error = ""; render();
+        try {
+          if (mode === "register") {
+            const res = await CAD.api.register(email, password);
+            devCode = res && res.devCode ? res.devCode : null;
+            busy = false;
+            mode = "signupCode";
+            render();
+            const cw = document.querySelector(".code-input");
+            if (cw && cw.focusFirst) cw.focusFirst();
+            return;
+          }
+          await CAD.api.login(email, password);
+          CAD.api.setGuest(false);
+          try { localStorage.setItem("cadence.lastEmail", email); } catch (e) {}
+          password = "";
+          CAD.toast("Signed in as " + email);
+          CAD.render(true);
+          return;
+        } catch (err) {
+          error = err.message || "That did not work.";
+        }
+        busy = false;
+        render();
+      }
+
+      return h("form", { class: "auth-card", onsubmit: submit },
+        h("div", { class: "seg", style: { marginBottom: "16px" } },
+          h("button", {
+            type: "button", class: "seg__btn", "aria-pressed": String(mode === "register"),
+            onclick: () => { if (mode !== "register") { mode = "register"; error = ""; render(); } }
+          }, "Create account"),
+          h("button", {
+            type: "button", class: "seg__btn", "aria-pressed": String(mode === "login"),
+            onclick: () => { if (mode !== "login") { mode = "login"; error = ""; render(); } }
+          }, "Sign in")),
+        h("h2", mode === "register" ? "Create your account" : "Welcome back"),
+        h("p", { class: "tiny muted" }, mode === "register"
+          ? "We confirm your email with a code once. After that it is just your email and password, on any device."
+          : "Your email and password. Nothing else needed."),
+        h("div", { class: "field", style: { marginTop: "16px" } },
+          h("label", { class: "field__label", for: "authEmail" }, "Email address"),
+          emailInput),
+        h("div", { class: "field", style: { marginTop: "12px" } },
+          h("label", { class: "field__label", for: "authPassword" }, "Password"),
+          pwInput),
+        error ? h("p", { class: "auth-error" }, CAD.icon("alert", 16), error) : null,
+        btn,
+        h("button", {
+          type: "button", class: "btn btn--ghost btn--block", style: { marginTop: "10px" },
+          onclick: () => { mode = "email"; error = ""; render(); }
+        }, CAD.icon("checkin"), "Email me a code instead"),
+        h("button", {
+          type: "button", class: "btn btn--block demo-btn", style: { marginTop: "10px" },
+          onclick: startDemo
+        }, CAD.icon("sparkle"), "Try the demo — 28 days of data"),
+        h("button", {
+          type: "button", class: "btn btn--ghost btn--block", style: { marginTop: "8px" },
+          onclick: () => {
+            CAD.api.setGuest(true);
+            CAD.toast("Using Cadence on this device only.");
+            CAD.render();
+          }
+        }, CAD.icon("lock"), "Start empty on this device"));
     }
 
     function emailPanel() {
@@ -106,7 +241,7 @@
         autocomplete: "email", "aria-label": "Email address", id: "authEmail",
         oninput: (e) => { email = e.target.value.trim(); }
       });
-      const btn = h("button", { class: "btn btn--primary btn--lg btn--block", disabled: busy },
+      const btn = h("button", { class: "btn btn--primary btn--lg btn--block", type: "submit", disabled: busy },
         busy ? "Sending…" : "Email me a sign-in code");
 
       async function submit(e) {
@@ -133,31 +268,23 @@
         }
       }
 
-      btn.addEventListener("click", submit);
-
       return h("form", { class: "auth-card", onsubmit: submit },
-        h("p", { class: "eyebrow" }, "Create your account"),
-        h("h2", "Start with your email"),
-        h("p", { class: "tiny muted" }, "No password to forget. We send a six-digit code and sign you in — the same way your bank does it."),
+        h("p", { class: "eyebrow" }, "No password"),
+        h("h2", "Get a code by email"),
+        h("p", { class: "tiny muted" }, "We send a six-digit code and sign you in, the same way your bank does it."),
         h("div", { class: "field", style: { marginTop: "16px" } },
           h("label", { class: "field__label", for: "authEmail" }, "Email address"),
           input),
         error ? h("p", { class: "auth-error" }, CAD.icon("alert", 16), error) : null,
         btn,
         h("button", {
+          type: "button", class: "btn btn--ghost btn--block", style: { marginTop: "10px" },
+          onclick: () => { mode = "register"; error = ""; render(); }
+        }, CAD.icon("lock"), "Use a password instead"),
+        h("button", {
           type: "button", class: "btn btn--block demo-btn", style: { marginTop: "10px" },
           onclick: startDemo
-        }, CAD.icon("sparkle"), "Try the demo — 28 days of data"),
-        h("button", {
-          type: "button", class: "btn btn--ghost btn--block", style: { marginTop: "8px" },
-          onclick: () => {
-            CAD.api.setGuest(true);
-            CAD.toast("Using Cadence on this device only.");
-            CAD.render();
-          }
-        }, CAD.icon("lock"), "Start empty on this device"),
-        h("p", { class: "tiny muted", style: { marginTop: "14px" } },
-          "Your account stores your email address and nothing else. Health data stays on your device unless you switch on encrypted backup, which encrypts it with a passphrase we never receive."));
+        }, CAD.icon("sparkle"), "Try the demo — 28 days of data"));
     }
 
     function codePanel() {
@@ -215,7 +342,7 @@
             h("p", { style: { margin: "4px 0 0" } }, "No mail provider is configured on this server, so the code appears here instead of in your inbox. Set RESEND_API_KEY in the environment and real email is sent."))) : null,
         h("div", { class: "row", style: { marginTop: "12px" } },
           resend,
-          h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: () => { mode = "landing"; error = ""; devCode = null; render(); } }, "Use a different email")));
+          h("button", { type: "button", class: "btn btn--ghost btn--sm", onclick: () => { mode = "email"; error = ""; devCode = null; render(); } }, "Use a different email")));
       setTimeout(() => { if (boxes.focusFirst) boxes.focusFirst(); }, 30);
       return panel;
     }

@@ -56,16 +56,16 @@ const MIME = {
   ".txt": "text/plain; charset=utf-8"
 };
 
-let db = { accounts: {}, codes: {}, backups: {} };
+let db = { accounts: {}, codes: {}, backups: {}, pending: {} };
 let writeQueue = Promise.resolve();
 
 async function loadDb() {
   try {
     await fsp.mkdir(DATA_DIR, { recursive: true });
     const raw = await fsp.readFile(DB_PATH, "utf8");
-    db = Object.assign({ accounts: {}, codes: {}, backups: {} }, JSON.parse(raw));
+    db = Object.assign({ accounts: {}, codes: {}, backups: {}, pending: {} }, JSON.parse(raw));
   } catch (e) {
-    db = { accounts: {}, codes: {}, backups: {} };
+    db = { accounts: {}, codes: {}, backups: {}, pending: {} };
   }
 }
 
@@ -85,6 +85,14 @@ function normaliseEmail(email) {
 
 function validEmail(email) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email) && email.length <= 254;
+}
+
+function hashPassword(password, salt) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, { N: 16384, r: 8, p: 1 }, (err, key) => {
+      if (err) reject(err); else resolve(key);
+    });
+  });
 }
 
 function hashCode(email, code) {
@@ -380,6 +388,112 @@ async function handleApi(req, res, url) {
     } catch (e) {
       return send(res, 502, { error: "Could not reach the model provider." });
     }
+  }
+
+  if (route === "/api/auth/register" && req.method === "POST") {
+    const body = await readBody(req);
+    const email = normaliseEmail(body.email);
+    const password = String(body.password || "");
+    if (!validEmail(email)) return send(res, 400, { error: "Enter a valid email address." });
+    if (password.length < 8) return send(res, 400, { error: "Use a password of at least 8 characters." });
+    if (password.length > 200) return send(res, 400, { error: "That password is too long." });
+    if (rateLimited("reg:" + email, 5, 15 * 60 * 1000) || rateLimited("regip:" + ip, 20, 15 * 60 * 1000)) {
+      return send(res, 429, { error: "Too many attempts. Wait fifteen minutes and try again." });
+    }
+
+    const existing = Object.values(db.accounts).find((a) => a.email === email);
+    if (existing && existing.passwordHash) {
+      return send(res, 409, { error: "An account with that email already exists. Sign in instead." });
+    }
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = (await hashPassword(password, salt)).toString("hex");
+    const code = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+    db.pending[email] = {
+      email, salt, passwordHash,
+      hash: hashCode(email, code),
+      expires: Date.now() + CODE_TTL_MS,
+      attempts: 0
+    };
+    await saveDb();
+
+    try {
+      await sendEmail(email, code);
+    } catch (e) {
+      console.error("[cadence] mail send failed:", e.message);
+      if (/unrecognis|unrecogniz/i.test(e.message)) {
+        return send(res, 502, { error: "Email is blocked by the mail provider's IP allowlist on this server. Use the demo, or device-only mode, while that is fixed." });
+      }
+      if (/\b403\b|verify a domain|not verified|testing emails/i.test(e.message)) {
+        return send(res, 502, { error: "This server can only email the address on its own mail-provider account until a sending domain is verified." });
+      }
+      return send(res, 502, { error: "Could not send the verification email. Try again in a moment." });
+    }
+    return send(res, 200, DEV_CODES ? { ok: true, devCode: code } : { ok: true });
+  }
+
+  if (route === "/api/auth/verify-signup" && req.method === "POST") {
+    const body = await readBody(req);
+    const email = normaliseEmail(body.email);
+    const code = String(body.code || "").trim();
+    if (!validEmail(email) || !/^\d{6}$/.test(code)) return send(res, 400, { error: "Enter the six-digit code." });
+    if (rateLimited("vsignup:" + email, 10, 15 * 60 * 1000)) return send(res, 429, { error: "Too many attempts. Start again." });
+
+    const record = db.pending[email];
+    if (!record) return send(res, 400, { error: "Start the sign-up again." });
+    if (record.expires < Date.now()) { delete db.pending[email]; await saveDb(); return send(res, 400, { error: "That code expired. Start the sign-up again." }); }
+    record.attempts++;
+    if (record.attempts > MAX_ATTEMPTS) { delete db.pending[email]; await saveDb(); return send(res, 429, { error: "Too many wrong codes. Start the sign-up again." }); }
+    const given = Buffer.from(hashCode(email, code));
+    const want = Buffer.from(record.hash);
+    if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) {
+      await saveDb();
+      return send(res, 400, { error: "That code is not right. " + (MAX_ATTEMPTS - record.attempts + 1) + " attempts left." });
+    }
+
+    let account = Object.values(db.accounts).find((a) => a.email === email);
+    if (!account) {
+      account = { id: crypto.randomUUID(), email, createdAt: Date.now() };
+      db.accounts[account.id] = account;
+    }
+    account.salt = record.salt;
+    account.passwordHash = record.passwordHash;
+    account.verified = true;
+    account.lastSeen = Date.now();
+    delete db.pending[email];
+    await saveDb();
+
+    const token = signSession({ sub: account.id, exp: Date.now() + SESSION_DAYS * 86400000 });
+    const secure = (req.headers["x-forwarded-proto"] || "").indexOf("https") === 0 ? " Secure;" : "";
+    return send(res, 200, { account: { id: account.id, email: account.email, createdAt: account.createdAt } }, {
+      "Set-Cookie": "cadence_session=" + token + "; HttpOnly; Path=/; SameSite=Lax;" + secure + " Max-Age=" + SESSION_DAYS * 86400
+    });
+  }
+
+  if (route === "/api/auth/login" && req.method === "POST") {
+    const body = await readBody(req);
+    const email = normaliseEmail(body.email);
+    const password = String(body.password || "");
+    if (!validEmail(email) || !password) return send(res, 400, { error: "Enter your email and password." });
+    if (rateLimited("login:" + email, 10, 15 * 60 * 1000) || rateLimited("loginip:" + ip, 40, 15 * 60 * 1000)) {
+      return send(res, 429, { error: "Too many attempts. Wait fifteen minutes and try again." });
+    }
+    const account = Object.values(db.accounts).find((a) => a.email === email);
+    if (!account || !account.passwordHash) {
+      return send(res, 401, { error: "No account with that email and password. Check both, or create an account." });
+    }
+    const attempt = await hashPassword(password, account.salt);
+    const stored = Buffer.from(account.passwordHash, "hex");
+    if (attempt.length !== stored.length || !crypto.timingSafeEqual(attempt, stored)) {
+      return send(res, 401, { error: "No account with that email and password. Check both, or create an account." });
+    }
+    account.lastSeen = Date.now();
+    await saveDb();
+    const token = signSession({ sub: account.id, exp: Date.now() + SESSION_DAYS * 86400000 });
+    const secure = (req.headers["x-forwarded-proto"] || "").indexOf("https") === 0 ? " Secure;" : "";
+    return send(res, 200, { account: { id: account.id, email: account.email, createdAt: account.createdAt } }, {
+      "Set-Cookie": "cadence_session=" + token + "; HttpOnly; Path=/; SameSite=Lax;" + secure + " Max-Age=" + SESSION_DAYS * 86400
+    });
   }
 
   if (route === "/api/chat" && req.method === "POST") {

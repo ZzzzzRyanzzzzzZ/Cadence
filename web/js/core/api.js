@@ -80,6 +80,24 @@
     return res;
   }
 
+  function register(email, password) {
+    return call("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
+  }
+
+  async function verifySignup(email, code) {
+    const res = await call("/api/auth/verify-signup", { method: "POST", body: JSON.stringify({ email, code }) });
+    state.account = res.account;
+    writeLocal({ email: res.account.email, id: res.account.id });
+    return res;
+  }
+
+  async function login(email, password) {
+    const res = await call("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    state.account = res.account;
+    writeLocal({ email: res.account.email, id: res.account.id });
+    return res;
+  }
+
   async function logout() {
     try { await call("/api/auth/logout", { method: "POST" }); } catch (e) {}
     state.account = null;
@@ -120,7 +138,7 @@
   }
 
   CAD.api = {
-    state, probe, me, requestCode, verifyCode, logout,
+    state, probe, me, requestCode, verifyCode, register, verifySignup, login, logout,
     saveBackup, loadBackup, deleteAccount, coach, chat, localSession, isGuest, setGuest
   };
 })();
