@@ -41,7 +41,7 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY || "";
 const MAIL_PROVIDER = RESEND_API_KEY ? "resend" : BREVO_API_KEY ? "brevo" : "";
 const MAIL_FROM = process.env.MAIL_FROM || "Cadence <onboarding@resend.dev>";
 const FEATHERLESS_API_KEY = process.env.FEATHERLESS_API_KEY || "";
-const FEATHERLESS_MODEL = process.env.FEATHERLESS_MODEL || "meta-llama/Meta-Llama-3.1-8B-Instruct";
+const FEATHERLESS_MODEL = process.env.FEATHERLESS_MODEL || "NousResearch/Meta-Llama-3.1-8B-Instruct";
 const DEV_CODES = !MAIL_PROVIDER;
 
 const MIME = {

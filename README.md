@@ -44,7 +44,7 @@ Every variable is optional. With no mail provider set, Cadence runs in demo mode
 | `MAIL_FROM` | The sender, as `Name <address>`. Must match a verified domain (Resend) or a confirmed sender (Brevo). |
 | `SESSION_SECRET` | Any long random string. Without it, sessions reset on every restart. |
 | `FEATHERLESS_API_KEY` | Optional. Enables the plain-language weekly summary. |
-| `FEATHERLESS_MODEL` | Optional. Defaults to `meta-llama/Meta-Llama-3.1-8B-Instruct`. |
+| `FEATHERLESS_MODEL` | Optional. Defaults to `NousResearch/Meta-Llama-3.1-8B-Instruct`. |
 | `PORT` | Defaults to 3000. |
 | `DATA_DIR` | Where accounts and encrypted backups are stored. Defaults to `./.data`. |
 
