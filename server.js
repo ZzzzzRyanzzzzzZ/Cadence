@@ -182,6 +182,36 @@ function rateLimited(key, max, windowMs) {
   return entry.count > max;
 }
 
+const FALLBACK_MODEL = "NousResearch/Meta-Llama-3.1-8B-Instruct";
+let activeModel = FEATHERLESS_MODEL;
+
+async function callModel(messages, maxTokens, temperature) {
+  const tried = [];
+  const candidates = activeModel === FALLBACK_MODEL ? [FALLBACK_MODEL] : [activeModel, FALLBACK_MODEL];
+  for (const model of candidates) {
+    const res = await fetch("https://api.featherless.ai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + FEATHERLESS_API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages })
+    });
+    if (res.ok) {
+      if (model !== activeModel) {
+        console.warn("[cadence] model " + activeModel + " unavailable, now using " + model);
+        activeModel = model;
+      }
+      const data = await res.json();
+      const message = data && data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
+      return { ok: true, text: String(message || "").trim() };
+    }
+    const text = await res.text();
+    tried.push(model + " -> " + res.status);
+    const recoverable = res.status === 403 || res.status === 404 || /gated|not found|unknown model|does not exist/i.test(text);
+    if (!recoverable) return { ok: false, status: res.status, text };
+    console.warn("[cadence] model rejected (" + res.status + "): " + text.slice(0, 140));
+  }
+  return { ok: false, status: 502, text: "No usable model. Tried: " + tried.join(", ") };
+}
+
 function parseFrom(value) {
   const match = value.match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
   if (match) return { name: match[1] || "Cadence", email: match[2].trim() };
@@ -361,30 +391,17 @@ async function handleApi(req, res, url) {
     const body = await readBody(req, 16 * 1024);
     const summary = String(body.summary || "").slice(0, 2000);
     if (!summary) return send(res, 400, { error: "Nothing to summarise." });
+    const messages = [
+      {
+        role: "system",
+        content: "You explain concussion-recovery tracking data in plain language for the person it belongs to. Rules: never diagnose, never say whether they are recovered or cleared to play, never predict a recovery date, never contradict the graded return-to-activity protocol, and never suggest pushing through symptoms. Refer to a clinician for anything clinical. Two short paragraphs, warm and concrete, no lists, no emoji."
+      },
+      { role: "user", content: "Here are this week's aggregate numbers from my tracking app. Summarise what changed and one thing to watch.\n\n" + summary }
+    ];
     try {
-      const upstream = await fetch("https://api.featherless.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + FEATHERLESS_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: FEATHERLESS_MODEL,
-          max_tokens: 320,
-          temperature: 0.3,
-          messages: [
-            {
-              role: "system",
-              content: "You explain concussion-recovery tracking data in plain language for the person it belongs to. Rules: never diagnose, never say whether they are recovered or cleared to play, never predict a recovery date, never contradict the graded return-to-activity protocol, and never suggest pushing through symptoms. Refer to a clinician for anything clinical. Two short paragraphs, warm and concrete, no lists, no emoji."
-            },
-            { role: "user", content: "Here are this week's aggregate numbers from my tracking app. Summarise what changed and one thing to watch.\n\n" + summary }
-          ]
-        })
-      });
-      if (!upstream.ok) {
-        const text = await upstream.text();
-        return send(res, 502, { error: "Model provider error: " + upstream.status + " " + text.slice(0, 160) });
-      }
-      const data = await upstream.json();
-      const message = data && data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
-      return send(res, 200, { text: String(message || "").trim() });
+      const out = await callModel(messages, 320, 0.3);
+      if (!out.ok) return send(res, 502, { error: "Model provider error: " + out.status + " " + String(out.text).slice(0, 160) });
+      return send(res, 200, { text: out.text });
     } catch (e) {
       return send(res, 502, { error: "Could not reach the model provider." });
     }
@@ -529,23 +546,9 @@ async function handleApi(req, res, url) {
     ].join("\n");
 
     try {
-      const upstream = await fetch("https://api.featherless.ai/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + FEATHERLESS_API_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: FEATHERLESS_MODEL,
-          max_tokens: 420,
-          temperature: 0.4,
-          messages: [{ role: "system", content: system }].concat(messages)
-        })
-      });
-      if (!upstream.ok) {
-        const text = await upstream.text();
-        return send(res, 502, { error: "Model provider error: " + upstream.status + " " + text.slice(0, 160) });
-      }
-      const data = await upstream.json();
-      const message = data && data.choices && data.choices[0] && data.choices[0].message ? data.choices[0].message.content : "";
-      return send(res, 200, { text: String(message || "").trim() });
+      const out = await callModel([{ role: "system", content: system }].concat(messages), 420, 0.4);
+      if (!out.ok) return send(res, 502, { error: "Model provider error: " + out.status + " " + String(out.text).slice(0, 160) });
+      return send(res, 200, { text: out.text });
     } catch (e) {
       return send(res, 502, { error: "Could not reach the model provider." });
     }
