@@ -1,3 +1,5 @@
+<img src="web/brand/cadence-wordmark.png" alt="Cadence — Recovery has a rhythm" width="440">
+
 # Cadence
 
 **Recovery has a rhythm.**
