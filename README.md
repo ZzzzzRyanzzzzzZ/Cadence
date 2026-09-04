@@ -33,6 +33,23 @@ npm run check-mail
 
 It authenticates the key, then tells you specifically why recipients would be rejected — an unverified `MAIL_FROM` domain on Resend, or an unconfirmed sender on Brevo.
 
+## Configuration
+
+Every variable is optional. With no mail provider set, Cadence runs in demo mode and shows sign-in codes on screen.
+
+| Variable | What it does |
+|---|---|
+| `BREVO_API_KEY` | Brevo API key. No domain needed, but the `MAIL_FROM` address must be a confirmed sender in Brevo. |
+| `RESEND_API_KEY` | Resend API key. Takes priority if both are set. Needs a verified domain to email anyone but yourself. |
+| `MAIL_FROM` | The sender, as `Name <address>`. Must match a verified domain (Resend) or a confirmed sender (Brevo). |
+| `SESSION_SECRET` | Any long random string. Without it, sessions reset on every restart. |
+| `FEATHERLESS_API_KEY` | Optional. Enables the plain-language weekly summary. |
+| `FEATHERLESS_MODEL` | Optional. Defaults to `meta-llama/Meta-Llama-3.1-8B-Instruct`. |
+| `PORT` | Defaults to 3000. |
+| `DATA_DIR` | Where accounts and encrypted backups are stored. Defaults to `./.data`. |
+
+Copy `.env.example` to `.env` and fill in what you need. `.env` is gitignored; `.env.example` is the only env file that is ever committed.
+
 ---
 
 ## The problem
@@ -158,7 +175,19 @@ Cadence has a real backend (accounts, email codes, encrypted backup), so where y
 
 **Render is the recommended target.** `render.yaml` is already written, so it is a Blueprint deploy: push to GitHub, then New -> Blueprint on Render, point it at the repo, and enter `BREVO_API_KEY` when prompted. `SESSION_SECRET` is generated automatically. Free instances sleep after 15 minutes idle and take roughly a minute to wake, so open the link once before demoing it to anyone.
 
-On the free plan accounts live in ephemeral storage: they survive restarts within a deploy but are wiped on redeploy. Health data is unaffected either way, because it never leaves the browser. `render.yaml` documents the two-line change for a persistent disk on a paid instance.
+On the free plan accounts live in ephemeral storage: they survive restarts within a deploy but are wiped on redeploy. Health data is unaffected either way, because it never leaves the browser.
+
+For accounts that persist across deploys, switch to a paid instance and give it a disk. Change `plan: free` to `plan: starter`, then add a disk block to the service and a `DATA_DIR` variable pointing at its mount path:
+
+```yaml
+    disk:
+      name: cadence-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+```
 
 **GitHub Pages** is set up as a static fallback in `.github/workflows/pages.yml`, publishing the `web/` folder on every push to `main`. There is no server there, so the sign-in probe fails and the landing page offers device-only mode instead. Every clinical feature, every model and all the charts work exactly the same, because they were always client side. It never sleeps, which makes it a good backup link for a live demo.
 

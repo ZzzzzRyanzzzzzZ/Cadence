@@ -23,18 +23,3 @@ services:
         sync: false
       - key: FEATHERLESS_MODEL
         sync: false
-
-# Accounts and encrypted backups live in DATA_DIR, which is ephemeral on the
-# free plan: they survive restarts within a deploy but are wiped on redeploy.
-# Health data is unaffected either way, because it never leaves the browser.
-#
-# For accounts that persist across deploys, switch to a paid instance and add a
-# disk. Change plan to "starter" and uncomment both blocks below:
-#
-#    disk:
-#      name: cadence-data
-#      mountPath: /var/data
-#      sizeGB: 1
-#
-#      - key: DATA_DIR
-#        value: /var/data
