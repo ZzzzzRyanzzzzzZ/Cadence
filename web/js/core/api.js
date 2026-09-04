@@ -50,6 +50,7 @@
       return true;
     } catch (e) {
       state.online = false;
+      state.staticHost = !!(e && e.status && e.status >= 400 && e.status < 500);
       return false;
     }
   }

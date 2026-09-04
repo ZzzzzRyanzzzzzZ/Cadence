@@ -205,16 +205,19 @@
     }
 
     function offlinePanel() {
+      const isStatic = CAD.api.state.staticHost;
       return h("div", { class: "auth-card" },
-        h("p", { class: "eyebrow" }, "Offline"),
-        h("h2", "No sign-in service reachable"),
+        h("p", { class: "eyebrow" }, isStatic ? "Private build" : "Offline"),
+        h("h2", isStatic ? "Runs entirely in your browser" : "No sign-in service reachable"),
         h("p", { class: "tiny muted" }, location.protocol === "file:"
           ? "You opened Cadence straight from the file system, so accounts and email codes are not available. Run npm start and open http://localhost:3000 for the full site."
-          : "The Cadence server did not respond. You can still use everything locally — accounts only add encrypted backup across devices."),
+          : isStatic
+            ? "This build has no server behind it, so there is no account to create and nothing to sign in to. Every check-in, test, model and chart works exactly the same — all of it was always computed on your own device. Nothing you enter here can leave it."
+            : "The Cadence server did not respond. You can still use everything locally — accounts only add encrypted backup across devices."),
         h("button", {
           class: "btn btn--primary btn--lg btn--block", style: { marginTop: "16px" },
           onclick: () => { CAD.api.setGuest(true); CAD.render(); }
-        }, CAD.icon("arrow"), "Continue on this device"));
+        }, CAD.icon("arrow"), CAD.api.state.staticHost ? "Start using Cadence" : "Continue on this device"));
     }
 
     function hero() {
