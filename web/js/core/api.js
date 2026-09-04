@@ -23,10 +23,12 @@
     } catch (e) {}
   }
 
-  async function call(path, options) {
+  async function call(path, options, timeoutMs) {
     const opts = Object.assign({ credentials: "same-origin", headers: { "Content-Type": "application/json" } }, options || {});
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const limit = timeoutMs || 15000;
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, limit);
     try {
       const res = await fetch(path, Object.assign({ signal: controller.signal }, opts));
       const text = await res.text();
@@ -34,6 +36,14 @@
       try { body = text ? JSON.parse(text) : null; } catch (e) { body = { error: text }; }
       if (!res.ok) throw Object.assign(new Error((body && body.error) || ("Request failed (" + res.status + ")")), { status: res.status, body });
       return body;
+    } catch (err) {
+      if (timedOut || (err && err.name === "AbortError")) {
+        throw new Error("That took longer than " + Math.round(limit / 1000) + " seconds and timed out. Try again.");
+      }
+      if (err && err.message === "Failed to fetch") {
+        throw new Error("Could not reach the server. Check your connection and try again.");
+      }
+      throw err;
     } finally {
       clearTimeout(timer);
     }
@@ -118,11 +128,11 @@
   }
 
   function coach(summary) {
-    return call("/api/coach", { method: "POST", body: JSON.stringify({ summary }) });
+    return call("/api/coach", { method: "POST", body: JSON.stringify({ summary }) }, 90000);
   }
 
   function chat(messages, context) {
-    return call("/api/chat", { method: "POST", body: JSON.stringify({ messages, context }) });
+    return call("/api/chat", { method: "POST", body: JSON.stringify({ messages, context }) }, 90000);
   }
 
   function localSession() { return readLocal(); }

@@ -189,11 +189,18 @@ async function callModel(messages, maxTokens, temperature) {
   const tried = [];
   const candidates = activeModel === FALLBACK_MODEL ? [FALLBACK_MODEL] : [activeModel, FALLBACK_MODEL];
   for (const model of candidates) {
-    const res = await fetch("https://api.featherless.ai/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + FEATHERLESS_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages })
-    });
+    let res;
+    try {
+      res = await fetch("https://api.featherless.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + FEATHERLESS_API_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ model, max_tokens: maxTokens, temperature, messages }),
+        signal: AbortSignal.timeout(70000)
+      });
+    } catch (err) {
+      const timedOut = err && (err.name === "TimeoutError" || err.name === "AbortError");
+      return { ok: false, status: 504, text: timedOut ? "The model took too long to answer." : String(err.message || err) };
+    }
     if (res.ok) {
       if (model !== activeModel) {
         console.warn("[cadence] model " + activeModel + " unavailable, now using " + model);
